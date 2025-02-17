@@ -1,20 +1,18 @@
 import express from "express";
-import axios from "axios";
-import { Request, Response } from "express";
 import { ChatGroq } from "@langchain/groq";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 require("dotenv").config();
-const GROQ_API_KEY = "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";
-const authToken =
-  "EAAQ5nukhyqwBO0rit76eXflZC2APoYEnGNb7IqyesFeVh8KZAfR75WIhq0k84KJZAs8vhGFPSvoSp5iZBAIK8yknFQoe4vQdGE7N0qas1mbZAbQU5a6TpYqYvWfZCzwnO0talprOwZAO2DhlTzpqdDZAP7ykZCmdt7ZCGKXhHcgSTw40Jl1cBTlBEsEBwCxsy3OtqrZCx9qqGqGh0njhQhgsoP4HglYUZAWj16YhcQhjrq8oUe4ZD";
+const GROQ_API_KEY = process.env.GrOQ_API_KEY;
+const authToken  =  process.env.AUTH_TOKEN;
 process.env.LANGSMITH_TRACING;
 process.env.LANGSMITH_API_KEY;
+
 const llm = new ChatGroq({
   model: "mixtral-8x7b-32768",
   temperature: 0,
   apiKey: GROQ_API_KEY,
 });
-const promptTemplate = ChatPromptTemplate.fromMessages([
+const promptTemplate =  ChatPromptTemplate.fromMessages([
   [
     "system",
     "You talk like salaes  give i all  to the best of your ability.Answer only what the user asks. Do not provide additional information unless explicitly requested like list.",
@@ -67,20 +65,12 @@ app.get("/webhook", (req, res) => {
 });
 
 app.post("/webhook", express.json(), async (req, res): Promise<void> => {
-  console.log("Request:", req.body);
   const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-  console.log("Message:", message);
-  if (!message) {
-    res.sendStatus(200);
-    return;
+  if (!message || !message.text.body || !message.from) {
+    res.status(404).send("No message received.");
+    return
   }
-  const input = [
-    {
-      role: "user",
-      content: "Hi! I'm Bob.",
-    },
-  ];
-  const output = await llmApp.invoke({ messages: input }, config);
+
   // The output contains all messages in the state.
   // This will long the last message in the conversation.d
   const input2 = [
@@ -144,15 +134,16 @@ app.post("/webhook", express.json(), async (req, res): Promise<void> => {
   ];
   const config2 = { configurable: { thread_id: uuidv4() } };
   const output2 = await llmApp.invoke({ messages: input2 }, config2);
-  console.log(output2.messages[output2.messages.length - 1].content);
+  console.log( "output3",output2.messages[output2.messages.length - 1].content);
+
   const input3 = [
     {
       role: "user",
-      content: String(message.text), // Ensure it's a string
+      content: message?.text?.body ? String(message.text.body) : "No message"
     },
-  ];
+];
 
-  // Invoke the model
+ console.log("User Phone:", input3);
   const output3 = await llmApp.invoke({ messages: input3 }, config2);
   console.log(output3.messages[output3.messages.length - 1]);
 
@@ -161,10 +152,11 @@ app.post("/webhook", express.json(), async (req, res): Promise<void> => {
   const userInput: string = String(
     output3.messages[output3.messages.length - 1].content
   );
-
+ console.log("User Phone:", userInput);
   // Send WhatsApp message
   await sendWhatsAppMessage(userPhone, userInput);
-  res.status(200);
+  res.status(200).json({ message: "Message sent successfully." });
+  return ;
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
